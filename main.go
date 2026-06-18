@@ -5,6 +5,8 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"github.com/aloki-alok/mctop/internal/cli"
 )
 
 // version is overridden at release time via -ldflags.
@@ -27,8 +29,9 @@ func run(args []string) int {
 	case "help", "--help", "-h":
 		usage(os.Stdout)
 		return 0
-	case "ls", "call", "test", "record":
-		// Wired up in later slices (see DESIGN.md build order).
+	case "ls":
+		return cli.LS(args[1:])
+	case "call", "test", "record":
 		fmt.Fprintf(os.Stderr, "mctop: %q is not implemented yet\n", args[0])
 		return 2
 	default:
