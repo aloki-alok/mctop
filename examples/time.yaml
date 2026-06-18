@@ -1,0 +1,15 @@
+# A contract for the reference MCP time server. Run it with:
+#   mctop test examples/time.yaml
+server:
+  command: "uvx mcp-server-time"
+expect:
+  tools:
+    - get_current_time
+    - convert_time
+calls:
+  - tool: get_current_time
+    args:
+      timezone: UTC
+    assert:
+      not_error: true
+      contains: datetime

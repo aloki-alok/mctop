@@ -33,7 +33,9 @@ func run(args []string) int {
 		return cli.LS(args[1:])
 	case "call":
 		return cli.Call(args[1:])
-	case "test", "record":
+	case "test":
+		return cli.Test(args[1:])
+	case "record":
 		fmt.Fprintf(os.Stderr, "mctop: %q is not implemented yet\n", args[0])
 		return 2
 	default:

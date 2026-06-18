@@ -2,7 +2,10 @@ module github.com/aloki-alok/mctop
 
 go 1.26.4
 
-require github.com/modelcontextprotocol/go-sdk v1.6.1
+require (
+	github.com/modelcontextprotocol/go-sdk v1.6.1
+	gopkg.in/yaml.v3 v3.0.1
+)
 
 require (
 	github.com/google/jsonschema-go v0.4.3 // indirect
