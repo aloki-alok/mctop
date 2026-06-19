@@ -41,6 +41,8 @@ func run(args []string) int {
 		return cli.Login(args[1:])
 	case "logout":
 		return cli.Logout(args[1:])
+	case "upgrade":
+		return cli.Upgrade(version)
 	case "record":
 		fmt.Fprintf(os.Stderr, "mctop: %q is not implemented yet\n", args[0])
 		return 2
@@ -86,6 +88,7 @@ Usage:
   mctop test <spec.yaml>      run a contract, exit 0 on pass, 1 on fail
   mctop login <url>           log in to an OAuth-protected server
   mctop logout <url>          forget a server's cached token
+  mctop upgrade               update mctop to the latest release
 
 A target is a command to spawn ("uvx mcp-server-time") or an http(s):// URL.
 `)
