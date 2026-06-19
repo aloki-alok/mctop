@@ -5,8 +5,10 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/aloki-alok/mctop/internal/cli"
+	"github.com/aloki-alok/mctop/internal/ui"
 )
 
 // version is overridden at release time via -ldflags.
@@ -18,8 +20,8 @@ func main() {
 
 func run(args []string) int {
 	if len(args) == 0 {
-		usage(os.Stderr)
-		return 2
+		welcome(os.Stdout)
+		return 0
 	}
 
 	switch args[0] {
@@ -50,9 +52,35 @@ func run(args []string) int {
 	}
 }
 
-func usage(w *os.File) {
-	fmt.Fprint(w, `mctop: a terminal client for MCP servers.
+// welcome is the friendly first-run screen for a bare invocation: the wordmark
+// and a short quickstart, rather than a wall of usage.
+func welcome(w *os.File) {
+	s := ui.For(w)
+	fmt.Fprintln(w, s.Banner())
+	fmt.Fprintf(w, "\n%s  %s  %s\n\n", s.Dim("a terminal client for MCP servers"), s.Dim("·"), s.Dim(version))
+	fmt.Fprintln(w, s.Accent("quickstart"))
+	fmt.Fprintln(w, quickstart(s, "mctop ls uvx mcp-server-time", "explore a server"))
+	fmt.Fprintln(w, quickstart(s, "mctop login <url>", "log in to an OAuth server"))
+	fmt.Fprintln(w, quickstart(s, "mctop call <url> <tool> k=v", "call a tool"))
+	fmt.Fprintln(w, quickstart(s, "mctop test spec.yaml", "gate a server in CI"))
+	fmt.Fprintf(w, "\nrun %s for all commands.\n", s.Bold("mctop help"))
+}
 
+// quickstart renders one aligned "command  description" row, padding on the
+// plain command so ANSI codes never throw off the column.
+func quickstart(s ui.Style, command, desc string) string {
+	const width = 30
+	gap := width - len(command)
+	if gap < 1 {
+		gap = 1
+	}
+	return "  " + s.Bold(command) + strings.Repeat(" ", gap) + s.Dim(desc)
+}
+
+func usage(w *os.File) {
+	s := ui.For(w)
+	fmt.Fprintln(w, s.Banner())
+	fmt.Fprint(w, `
 Usage:
   mctop <target>              open the TUI against a server
   mctop ls <target>           list tools, resources, and prompts
