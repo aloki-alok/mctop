@@ -168,17 +168,23 @@ func (m model) updateResult(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "esc":
 		m.screen = browse
+		return m, nil
 	case "e":
 		if m.formTool != nil {
 			m.screen = form
 		}
+		return m, nil
 	case "r":
 		if m.lastCmd != nil {
 			m.running = true
 			return m, m.lastCmd
 		}
+		return m, nil
 	}
-	return m, nil
+	// Otherwise scroll the result (up/down, page keys).
+	var cmd tea.Cmd
+	m.vp, cmd = m.vp.Update(key)
+	return m, cmd
 }
 
 func (m model) viewForm() string {
@@ -205,6 +211,20 @@ func (m model) viewForm() string {
 	return b.String()
 }
 
+func (m model) resultBody() string {
+	var b strings.Builder
+	if m.resultErr != nil {
+		b.WriteString(red.Render("  " + m.resultErr.Error()))
+		if m.output != "" {
+			b.WriteString("\n")
+		}
+	}
+	if m.output != "" {
+		b.WriteString(indent(m.output))
+	}
+	return b.String()
+}
+
 func (m model) viewResult() string {
 	if m.running {
 		return m.header(m.resultTitle, dim.Render("running…")) + "\n\n" + dim.Render("  running...")
@@ -213,20 +233,14 @@ func (m model) viewResult() string {
 	if m.resultErr != nil {
 		status = red.Render("✗ ") + dim.Render(m.elapsed)
 	}
-	var b strings.Builder
-	b.WriteString(m.header(m.resultTitle+" → result", status) + "\n")
-	if m.resultErr != nil {
-		b.WriteString(red.Render("  "+m.resultErr.Error()) + "\n")
-	}
-	if m.output != "" {
-		b.WriteString(indent(m.output) + "\n")
-	}
 	keys := "  r re-run   esc back   q quit"
 	if m.formTool != nil {
 		keys = "  r re-run   e edit args   esc back   q quit"
 	}
-	b.WriteString(m.rule() + "\n" + dim.Render(keys))
-	return b.String()
+	if m.vp.TotalLineCount() > m.vp.Height {
+		keys = dim.Render(fmt.Sprintf("  %d%%  ", int(m.vp.ScrollPercent()*100))) + keys
+	}
+	return m.header(m.resultTitle+" → result", status) + "\n" + m.vp.View() + "\n" + m.rule() + "\n" + dim.Render(keys)
 }
 
 func indent(s string) string {

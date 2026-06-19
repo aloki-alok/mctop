@@ -8,12 +8,17 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/aloki-alok/mctop/internal/mcp"
 )
+
+// chromeHeight is the number of lines the header and footer occupy, reserved
+// from the viewport that scrolls a result.
+const chromeHeight = 4
 
 type section int
 
@@ -73,6 +78,7 @@ type model struct {
 	output      string
 	resultErr   error
 	elapsed     string
+	vp          viewport.Model
 }
 
 // dispatch starts an action (tool call, resource read, prompt render), showing
@@ -88,7 +94,7 @@ func (m model) dispatch(title string, cmd tea.Cmd) (tea.Model, tea.Cmd) {
 
 // New builds the model from an already-connected client and its loaded surface.
 func New(ctx context.Context, server string, client *mcp.Client, tools []*sdk.Tool, resources []*sdk.Resource, prompts []*sdk.Prompt) tea.Model {
-	return model{ctx: ctx, server: server, client: client, tools: tools, resources: resources, prompts: prompts}
+	return model{ctx: ctx, server: server, client: client, tools: tools, resources: resources, prompts: prompts, vp: viewport.New(0, 0)}
 }
 
 func (m model) Init() tea.Cmd { return nil }
@@ -97,11 +103,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		m.vp.Width = msg.Width
+		m.vp.Height = msg.Height - chromeHeight
 		return m, nil
 	case callResultMsg:
 		m.running = false
 		m.output, m.resultErr, m.elapsed = msg.output, msg.err, msg.elapsed
 		m.screen = result
+		m.vp.SetContent(m.resultBody())
+		m.vp.GotoTop()
 		return m, nil
 	}
 
