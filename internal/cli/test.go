@@ -8,6 +8,7 @@ import (
 
 	"github.com/aloki-alok/mctop/internal/mcp"
 	"github.com/aloki-alok/mctop/internal/spec"
+	"github.com/aloki-alok/mctop/internal/ui"
 )
 
 // Test runs a contract spec against its server and exits 0 when every check
@@ -76,13 +77,20 @@ func report(results []spec.Result, asJSON bool) (failed int) {
 		return failed
 	}
 
+	s := ui.For(os.Stdout)
 	for _, r := range results {
-		mark := "PASS"
+		mark := s.Green("PASS")
 		if !r.Pass {
-			mark = "FAIL"
+			mark = s.Red("FAIL")
 		}
-		fmt.Printf("  %s  %s  (%s)\n", mark, r.Name, r.Detail)
+		fmt.Printf("  %s  %s  %s\n", mark, r.Name, s.Dim("("+r.Detail+")"))
 	}
-	fmt.Printf("\n%d passed, %d failed\n", len(results)-failed, failed)
+	summary := fmt.Sprintf("%d passed, %d failed", len(results)-failed, failed)
+	if failed > 0 {
+		summary = s.Red(summary)
+	} else {
+		summary = s.Green(summary)
+	}
+	fmt.Printf("\n%s\n", summary)
 	return failed
 }

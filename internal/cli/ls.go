@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/aloki-alok/mctop/internal/mcp"
+	"github.com/aloki-alok/mctop/internal/ui"
 )
 
 // LS connects to the target and prints its tools, resources, and prompts.
@@ -33,8 +34,9 @@ func LS(args []string) int {
 	}
 	defer client.Close()
 
+	s := ui.For(os.Stdout)
 	if name, version := client.Server(); name != "" {
-		fmt.Printf("%s %s\n", name, version)
+		fmt.Printf("%s %s\n", s.Bold(name), s.Dim(version))
 	}
 
 	tools, err := client.Tools(ctx)
@@ -42,28 +44,43 @@ func LS(args []string) int {
 		fmt.Fprintln(os.Stderr, "mctop: list tools:", err)
 		return 1
 	}
-	fmt.Printf("\ntools (%d)\n", len(tools))
-	for _, t := range tools {
-		fmt.Printf("  %-24s %s\n", t.Name, firstLine(t.Description))
+	rows := make([][2]string, len(tools))
+	for i, t := range tools {
+		rows[i] = [2]string{t.Name, firstLine(t.Description)}
+	}
+	printSection(s, "tools", rows)
+
+	if resources, err := client.Resources(ctx); err == nil && len(resources) > 0 {
+		rows := make([][2]string, len(resources))
+		for i, r := range resources {
+			rows[i] = [2]string{r.URI, firstLine(r.Description)}
+		}
+		printSection(s, "resources", rows)
 	}
 
-	resources, err := client.Resources(ctx)
-	if err == nil && len(resources) > 0 {
-		fmt.Printf("\nresources (%d)\n", len(resources))
-		for _, r := range resources {
-			fmt.Printf("  %-24s %s\n", r.URI, firstLine(r.Description))
+	if prompts, err := client.Prompts(ctx); err == nil && len(prompts) > 0 {
+		rows := make([][2]string, len(prompts))
+		for i, p := range prompts {
+			rows[i] = [2]string{p.Name, firstLine(p.Description)}
 		}
-	}
-
-	prompts, err := client.Prompts(ctx)
-	if err == nil && len(prompts) > 0 {
-		fmt.Printf("\nprompts (%d)\n", len(prompts))
-		for _, p := range prompts {
-			fmt.Printf("  %-24s %s\n", p.Name, firstLine(p.Description))
-		}
+		printSection(s, "prompts", rows)
 	}
 
 	return 0
+}
+
+// printSection prints an accented "label (n)" header followed by one aligned
+// "name  description" row each, padding on the plain name so styling does not
+// skew the column.
+func printSection(s ui.Style, label string, rows [][2]string) {
+	fmt.Printf("\n%s\n", s.Accent(fmt.Sprintf("%s (%d)", label, len(rows))))
+	for _, r := range rows {
+		gap := 24 - len(r[0])
+		if gap < 1 {
+			gap = 1
+		}
+		fmt.Printf("  %s%s%s\n", s.Bold(r[0]), strings.Repeat(" ", gap), s.Dim(r[1]))
+	}
 }
 
 // firstLine keeps listings to one row per item even when descriptions wrap.
