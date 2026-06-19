@@ -34,11 +34,13 @@ func (s Style) Accent(str string) string { return s.wrap("38;5;141", str) }
 func (s Style) Green(str string) string  { return s.wrap("32", str) }
 func (s Style) Red(str string) string    { return s.wrap("31", str) }
 
-const art = `          _
- _ __  __| |_ ___ _ __
-| '  \/ _|  _/ _ \ '_ \
-|_|_|_\__|\__\___/ .__/
-                 |_|`
+const art = "" +
+	"                   __            \n" +
+	"   ____ ___  _____/ /_____  ____ \n" +
+	"  / __ `__ \\/ ___/ __/ __ \\/ __ \\\n" +
+	" / / / / / / /__/ /_/ /_/ / /_/ /\n" +
+	"/_/ /_/ /_/\\___/\\__/\\____/ .___/ \n" +
+	"                        /_/      "
 
 // Banner returns the mctop wordmark, accent-colored when styling is on.
 func (s Style) Banner() string { return s.Accent(art) }
