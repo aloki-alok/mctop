@@ -62,10 +62,16 @@ tools, resources, and prompts; press enter on a tool to fill its arguments in a
 schema-driven form and run it; read the result, then go again.
 
 ```
-↑↓ move    enter open    / search    tab switch section    q quit
+↑↓ move    enter open    / search    tab switch section    ? keys    q quit
 ```
 
-In the result view: `r` re-runs, `e` edits the arguments, `esc` goes back.
+Results are shown as indented, colored JSON; press `t` to switch to the raw
+payload and back, and `y` to copy it to the clipboard. `r` re-runs, `e` edits the
+arguments, `esc` (or `←`) goes back.
+
+Vim motions (`h`/`j`/`k`/`l`, `g`/`G`) are on by default; `V` toggles them and the
+choice is remembered. The arrow keys always work either way. Press `?` for the
+full list of keys.
 
 ## Authentication
 
