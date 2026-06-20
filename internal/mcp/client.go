@@ -174,6 +174,40 @@ func RenderPrompt(r *sdk.GetPromptResult) string {
 	return b.String()
 }
 
+// RenderResult turns a tool result into the text mctop displays, choosing the
+// most structured form available so the insight view can lay it out. Text that
+// already is JSON (optionally inside a markdown fence) passes through; otherwise
+// the server's structured payload is used when present, falling back to the
+// plain text blocks.
+func RenderResult(res *sdk.CallToolResult) string {
+	text := RenderContent(res.Content)
+	if s := unwrapJSON(text); json.Valid([]byte(s)) {
+		return s
+	}
+	if res.StructuredContent != nil {
+		if raw, err := json.Marshal(res.StructuredContent); err == nil && json.Valid(raw) {
+			return string(raw)
+		}
+	}
+	return text
+}
+
+// unwrapJSON strips a surrounding markdown code fence so a JSON payload a server
+// wrapped for display can still be parsed. It leaves unfenced text untouched
+// beyond trimming surrounding whitespace.
+func unwrapJSON(s string) string {
+	t := strings.TrimSpace(s)
+	if !strings.HasPrefix(t, "```") {
+		return t
+	}
+	if nl := strings.IndexByte(t, '\n'); nl >= 0 {
+		t = t[nl+1:] // drop the opening ``` or ```json line
+	}
+	t = strings.TrimSpace(t)
+	t = strings.TrimSuffix(t, "```")
+	return strings.TrimSpace(t)
+}
+
 // RenderContent flattens a tool result's content blocks into readable text.
 // Text blocks pass through; other block types are shown as their JSON so nothing
 // is silently dropped.
