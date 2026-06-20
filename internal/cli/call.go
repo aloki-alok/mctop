@@ -48,7 +48,7 @@ func Call(args []string) int {
 		return 1
 	}
 
-	out := mcp.RenderContent(res.Content)
+	out := mcp.RenderResult(res)
 	if res.IsError {
 		fmt.Fprintln(os.Stderr, out)
 		return 1

@@ -103,7 +103,7 @@ func (m model) runCall() tea.Cmd {
 		if err != nil {
 			return callResultMsg{err: err, elapsed: elapsed}
 		}
-		out := mcp.RenderContent(res.Content)
+		out := mcp.RenderResult(res)
 		if res.IsError {
 			return callResultMsg{err: fmt.Errorf("tool returned an error"), output: out, elapsed: elapsed}
 		}
