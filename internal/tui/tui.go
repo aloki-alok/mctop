@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/aloki-alok/mctop/internal/config"
 	"github.com/aloki-alok/mctop/internal/mcp"
 )
 
@@ -83,6 +84,7 @@ type model struct {
 	query     string
 	searching bool
 	showHelp  bool
+	vim       bool // when on, the hjkl-family motions are active alongside the arrows
 
 	width, height int
 
@@ -116,7 +118,7 @@ func (m model) dispatch(title string, cmd tea.Cmd) (tea.Model, tea.Cmd) {
 
 // New builds the model from an already-connected client and its loaded surface.
 func New(ctx context.Context, server string, client *mcp.Client, tools []*sdk.Tool, resources []*sdk.Resource, prompts []*sdk.Prompt) tea.Model {
-	return model{ctx: ctx, server: server, client: client, tools: tools, resources: resources, prompts: prompts, vp: viewport.New(0, 0), spin: newSpinner()}
+	return model{ctx: ctx, server: server, client: client, tools: tools, resources: resources, prompts: prompts, vim: config.Load().Vim, vp: viewport.New(0, 0), spin: newSpinner()}
 }
 
 func (m model) Init() tea.Cmd { return nil }
@@ -180,35 +182,70 @@ func (m model) updateBrowse(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateSearch(key)
 	}
 	last := len(m.visibleItems()) - 1
+	// Vim motions are only live when vim mode is on; the arrow-key equivalents
+	// below always work.
+	if m.vim {
+		switch key.String() {
+		case "k":
+			m.cursor = clamp(m.cursor-1, 0, last)
+			return m, nil
+		case "j":
+			m.cursor = clamp(m.cursor+1, 0, last)
+			return m, nil
+		case "g":
+			m.cursor = 0
+			return m, nil
+		case "G":
+			m.cursor = clamp(last, 0, last)
+			return m, nil
+		case "L":
+			m.section, m.cursor, m.query = (m.section+1)%3, 0, ""
+			return m, nil
+		case "H":
+			m.section, m.cursor, m.query = (m.section+2)%3, 0, ""
+			return m, nil
+		case "l":
+			return m.open()
+		}
+	}
 	switch key.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
 	case "?":
 		m.showHelp = true
+	case "V":
+		m.toggleVim()
 	case "/":
 		m.searching = true
 	case "esc":
 		m.query, m.cursor = "", 0
-	case "tab", "]", "L":
+	case "tab", "]":
 		m.section, m.cursor, m.query = (m.section+1)%3, 0, ""
-	case "shift+tab", "[", "H":
+	case "shift+tab", "[":
 		m.section, m.cursor, m.query = (m.section+2)%3, 0, ""
-	case "up", "k":
+	case "up":
 		m.cursor = clamp(m.cursor-1, 0, last)
-	case "down", "j":
+	case "down":
 		m.cursor = clamp(m.cursor+1, 0, last)
 	case "ctrl+u":
 		m.cursor = clamp(m.cursor-10, 0, last)
 	case "ctrl+d":
 		m.cursor = clamp(m.cursor+10, 0, last)
-	case "g", "home":
+	case "home":
 		m.cursor = 0
-	case "G", "end":
+	case "end":
 		m.cursor = clamp(last, 0, last)
-	case "enter", "right", "l":
+	case "enter", "right":
 		return m.open()
 	}
 	return m, nil
+}
+
+// toggleVim flips vim mode and persists the choice. The receiver is a pointer so
+// the caller's model sees the new state; persistence is best-effort.
+func (m *model) toggleVim() {
+	m.vim = !m.vim
+	_ = config.Save(config.Config{Vim: m.vim})
 }
 
 func clamp(v, lo, hi int) int {
@@ -347,11 +384,16 @@ func (m model) helpView() string {
 		{"t", "toggle raw / pretty result"},
 		{"y", "copy the result to the clipboard"},
 		{"e", "edit a call's arguments"},
+		{"V", "turn vim motions on or off"},
 		{"?", "toggle this help"},
 		{"q", "quit"},
 	}
+	intro := "Arrow keys always work; vim motions are on. Press V to turn them off."
+	if !m.vim {
+		intro = "Arrow keys move; vim motions are off. Press V to turn them on."
+	}
 	var b strings.Builder
-	b.WriteString(dim.Render("Navigate with the arrow keys or vim motions.") + "\n\n")
+	b.WriteString(dim.Render(intro) + "\n\n")
 	for _, kb := range binds {
 		b.WriteString(accent.Render(fmt.Sprintf("  %-18s", kb[0])) + dim.Render(kb[1]) + "\n")
 	}
@@ -571,11 +613,15 @@ func (m model) footerView() string {
 	if m.searching {
 		left = "  " + accent.Render("/"+m.query) + dim.Render("   enter open  ·  esc cancel")
 	}
-	right := ""
-	if n := len(m.visibleItems()); n > 0 {
-		right = dim.Render(fmt.Sprintf("%d/%d  ", m.cursor+1, n))
+	badge := dim.Render("vim off")
+	if m.vim {
+		badge = accent.Render("vim on")
 	}
-	return m.rule() + "\n" + m.spread(left, right)
+	right := badge
+	if n := len(m.visibleItems()); n > 0 {
+		right += "   " + dim.Render(fmt.Sprintf("%d/%d", m.cursor+1, n))
+	}
+	return m.rule() + "\n" + m.spread(left, right+"  ")
 }
 
 // windowItems returns the slice of items visible around the cursor and the index

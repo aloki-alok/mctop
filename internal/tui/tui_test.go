@@ -17,6 +17,7 @@ func testModel() model {
 		prompts:   []*sdk.Prompt{{Name: "p"}},
 		width:     80,
 		height:    24,
+		vim:       true,
 	}
 }
 
@@ -78,7 +79,7 @@ func TestResultGoesBack(t *testing.T) {
 		{Type: tea.KeyLeft},
 		{Type: tea.KeyEsc},
 	} {
-		m := model{screen: result, width: 80, height: 24, spin: newSpinner()}
+		m := model{screen: result, width: 80, height: 24, spin: newSpinner(), vim: true}
 		next, _ := m.Update(msg)
 		if next.(model).screen != browse {
 			t.Fatalf("key %v should return to browse", msg)
@@ -128,6 +129,33 @@ func TestYankCopiesAndClears(t *testing.T) {
 	m, _ = send(m, key("j"))
 	if m.yankSeq != "" {
 		t.Fatal("the next key should clear the yank so OSC52 emits once")
+	}
+}
+
+func TestVimToggle(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	m := testModel()
+	m, _ = send(m, key("V"))
+	if m.vim {
+		t.Fatal("V should turn vim off")
+	}
+	m, _ = send(m, key("V"))
+	if !m.vim {
+		t.Fatal("V should turn vim back on")
+	}
+}
+
+func TestVimOffDisablesMotions(t *testing.T) {
+	m := testModel()
+	m.vim = false
+	m, _ = send(m, key("j"))
+	if m.cursor != 0 {
+		t.Fatalf("j should not move the cursor with vim off, got %d", m.cursor)
+	}
+	m, _ = send(m, key("down"))
+	if m.cursor != 1 {
+		t.Fatalf("arrow keys should still move with vim off, got %d", m.cursor)
 	}
 }
 

@@ -165,12 +165,34 @@ func (m model) updateResult(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
+	// Vim motions for scrolling and going back, live only when vim mode is on.
+	if m.vim {
+		switch key.String() {
+		case "j":
+			m.vp.LineDown(1)
+			return m, nil
+		case "k":
+			m.vp.LineUp(1)
+			return m, nil
+		case "g":
+			m.vp.GotoTop()
+			return m, nil
+		case "G":
+			m.vp.GotoBottom()
+			return m, nil
+		case "h":
+			m.screen = browse
+			return m, nil
+		}
+	}
 	switch key.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
 	case "?":
 		m.showHelp = true
-	case "esc", "h", "left", "backspace":
+	case "V":
+		m.toggleVim()
+	case "esc", "left", "backspace":
 		m.screen = browse
 	case "e":
 		if m.formTool != nil {
@@ -192,17 +214,17 @@ func (m model) updateResult(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.output != "" {
 			m.yankSeq = ansi.SetSystemClipboard(m.output)
 		}
-	case "j", "down":
+	case "down":
 		m.vp.LineDown(1)
-	case "k", "up":
+	case "up":
 		m.vp.LineUp(1)
 	case "ctrl+d":
 		m.vp.HalfViewDown()
 	case "ctrl+u":
 		m.vp.HalfViewUp()
-	case "g", "home":
+	case "home":
 		m.vp.GotoTop()
-	case "G", "end":
+	case "end":
 		m.vp.GotoBottom()
 	}
 	return m, nil
