@@ -152,6 +152,44 @@ func asObjectRows(v any) []*object {
 	return rows
 }
 
+// detectRows finds the navigable record set in a result. A bare array of objects
+// is the records directly; an envelope object (the common {status, total, data:
+// [...]} shape) is navigable when exactly one of its fields is an array of
+// objects, with the remaining fields shown as a summary above the table.
+func detectRows(v any) (rows []*object, envelope *object, key string) {
+	if r := asObjectRows(v); r != nil {
+		return r, nil, ""
+	}
+	o, ok := v.(*object)
+	if !ok {
+		return nil, nil, ""
+	}
+	count := 0
+	for _, k := range o.keys {
+		if r := asObjectRows(o.vals[k]); r != nil {
+			count++
+			rows, key = r, k
+		}
+	}
+	if count != 1 {
+		return nil, nil, ""
+	}
+	return rows, o, key
+}
+
+// without returns a copy of the object with one key removed, preserving order.
+func (o *object) without(key string) *object {
+	n := &object{vals: map[string]any{}}
+	for _, k := range o.keys {
+		if k == key {
+			continue
+		}
+		n.keys = append(n.keys, k)
+		n.vals[k] = o.vals[k]
+	}
+	return n
+}
+
 // renderTable lays an array of objects out as columns. It declines (ok=false)
 // when the array is empty, holds non-objects, or cannot be made to fit, so the
 // caller falls back to indented JSON.
@@ -177,6 +215,13 @@ func renderObjectTable(rows []*object, width, selected int) (string, bool) {
 	cols := orderedColumns(rows)
 	if len(cols) == 0 {
 		return "", false
+	}
+	// A wide record has too many columns to show readably; keep a scannable few
+	// and point at the row detail for the rest.
+	hidden := 0
+	if maxCols := clamp(width/18, 2, 8); len(cols) > maxCols {
+		hidden = len(cols) - maxCols
+		cols = cols[:maxCols]
 	}
 	headers := append([]string{"#"}, cols...)
 
@@ -251,7 +296,18 @@ func renderObjectTable(rows []*object, width, selected int) (string, bool) {
 		}
 	}
 	if extra > 0 {
-		b.WriteString("\n" + dim.Render(fmt.Sprintf("… %d more rows", extra)))
+		b.WriteString("\n" + gutter + dim.Render(fmt.Sprintf("… %d more rows", extra)))
+	}
+	if hidden > 0 {
+		unit := "fields"
+		if hidden == 1 {
+			unit = "field"
+		}
+		note := fmt.Sprintf("+ %d more %s per record", hidden, unit)
+		if selected >= 0 {
+			note += ", press enter to expand"
+		}
+		b.WriteString("\n" + gutter + dim.Render(note))
 	}
 	return b.String(), true
 }
