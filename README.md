@@ -65,10 +65,12 @@ schema-driven form and run it; read the result, then go again.
 ↑↓ move    enter open    / search    tab switch section    ? keys    q quit
 ```
 
-Results are laid out to fit the screen: a list of objects becomes a table, a
-flat object an aligned key/value block, and nested data colored, indented JSON.
-Press `t` for the raw payload, `y` to copy it. `r` re-runs, `e` edits the
-arguments, `esc` (or `←`) goes back.
+Results are shown as an insight view that reads the data: field names become
+plain labels, values are formatted by what they are (dates, yes/no, status,
+links, grouped numbers), nested objects become sections, arrays of objects
+become tables, and short fields flow into columns to fill the screen. Press `t`
+for the colored JSON, `y` to copy. `r` re-runs, `e` edits the arguments, `esc`
+(or `←`) goes back.
 
 Vim motions (`h`/`j`/`k`/`l`, `g`/`G`) are on by default; `V` toggles them and the
 choice is remembered. The arrow keys always work either way. Press `?` for the
