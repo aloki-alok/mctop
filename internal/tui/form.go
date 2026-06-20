@@ -165,23 +165,52 @@ func (m model) updateResult(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
+	// A table result with no row expanded yet: the up/down family selects a row
+	// instead of scrolling, and enter opens the selected row's detail view.
+	listNav := m.rows != nil && !m.jsonView && !m.rowOpen
+
 	// Vim motions for scrolling and going back, live only when vim mode is on.
 	if m.vim {
 		switch key.String() {
 		case "j":
-			m.vp.LineDown(1)
+			if listNav {
+				m.moveRow(1)
+			} else {
+				m.vp.LineDown(1)
+			}
 			return m, nil
 		case "k":
-			m.vp.LineUp(1)
+			if listNav {
+				m.moveRow(-1)
+			} else {
+				m.vp.LineUp(1)
+			}
 			return m, nil
 		case "g":
-			m.vp.GotoTop()
+			if listNav {
+				m.setRow(0)
+			} else {
+				m.vp.GotoTop()
+			}
 			return m, nil
 		case "G":
-			m.vp.GotoBottom()
+			if listNav {
+				m.setRow(len(m.rows) - 1)
+			} else {
+				m.vp.GotoBottom()
+			}
 			return m, nil
+		case "l":
+			if listNav {
+				m.expandRow()
+				return m, nil
+			}
 		case "h":
-			m.screen = browse
+			if m.rowOpen {
+				m.collapseRow()
+			} else {
+				m.screen = browse
+			}
 			return m, nil
 		}
 	}
@@ -193,7 +222,15 @@ func (m model) updateResult(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case "V":
 		m.toggleVim()
 	case "esc", "left", "backspace":
-		m.screen = browse
+		if m.rowOpen {
+			m.collapseRow()
+		} else {
+			m.screen = browse
+		}
+	case "enter", "right":
+		if listNav {
+			m.expandRow()
+		}
 	case "e":
 		if m.formTool != nil {
 			m.screen = form
@@ -206,6 +243,7 @@ func (m model) updateResult(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case "t":
 		if m.outputIsJSON() {
 			m.jsonView = !m.jsonView
+			m.rowOpen = false
 			off := m.vp.YOffset
 			m.vp.SetContent(m.resultBody())
 			m.vp.SetYOffset(off)
@@ -215,19 +253,89 @@ func (m model) updateResult(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.yankSeq = ansi.SetSystemClipboard(m.output)
 		}
 	case "down":
-		m.vp.LineDown(1)
+		if listNav {
+			m.moveRow(1)
+		} else {
+			m.vp.LineDown(1)
+		}
 	case "up":
-		m.vp.LineUp(1)
+		if listNav {
+			m.moveRow(-1)
+		} else {
+			m.vp.LineUp(1)
+		}
 	case "ctrl+d":
-		m.vp.HalfViewDown()
+		if listNav {
+			m.moveRow(m.rowPage())
+		} else {
+			m.vp.HalfViewDown()
+		}
 	case "ctrl+u":
-		m.vp.HalfViewUp()
+		if listNav {
+			m.moveRow(-m.rowPage())
+		} else {
+			m.vp.HalfViewUp()
+		}
 	case "home":
-		m.vp.GotoTop()
+		if listNav {
+			m.setRow(0)
+		} else {
+			m.vp.GotoTop()
+		}
 	case "end":
-		m.vp.GotoBottom()
+		if listNav {
+			m.setRow(len(m.rows) - 1)
+		} else {
+			m.vp.GotoBottom()
+		}
 	}
 	return m, nil
+}
+
+// moveRow and setRow change the highlighted record and keep it on screen.
+func (m *model) moveRow(delta int) { m.setRow(m.rowCursor + delta) }
+
+func (m *model) setRow(i int) {
+	m.rowCursor = clamp(i, 0, len(m.rows)-1)
+	m.vp.SetContent(m.resultBody())
+	m.ensureRowVisible()
+}
+
+// expandRow opens the selected record's full, untruncated detail view; collapseRow
+// returns to the table with the cursor preserved.
+func (m *model) expandRow() {
+	m.rowOpen = true
+	m.vp.SetContent(m.resultBody())
+	m.vp.GotoTop()
+}
+
+func (m *model) collapseRow() {
+	m.rowOpen = false
+	m.vp.SetContent(m.resultBody())
+	m.ensureRowVisible()
+}
+
+func (m *model) rowPage() int {
+	if p := m.vp.Height - 2; p > 1 {
+		return p
+	}
+	return 1
+}
+
+// ensureRowVisible scrolls the viewport so the highlighted row stays in view. The
+// table prints a header and a divider before the first record, so row i sits on
+// line i+2 (a table result carries no error prefix).
+func (m *model) ensureRowVisible() {
+	if m.vp.Height < 1 {
+		return
+	}
+	line := 2 + m.rowCursor
+	switch top := m.vp.YOffset; {
+	case line < top:
+		m.vp.SetYOffset(line)
+	case line >= top+m.vp.Height:
+		m.vp.SetYOffset(line - m.vp.Height + 1)
+	}
 }
 
 func (m model) viewForm() string {
@@ -291,18 +399,28 @@ func (m model) resultBody() string {
 // non-JSON output or payloads too large to lay out cheaply.
 func (m model) renderOutput() string {
 	w := m.vp.Width - 2
-	if len(m.output) <= maxPrettyBytes {
-		if v, err := decodeOrdered(m.output); err == nil {
-			if m.jsonView {
-				if s, ok := indentJSON(m.output); ok {
-					return s
-				}
-			} else {
-				return humanValue(v, w, 0)
-			}
+	if len(m.output) > maxPrettyBytes {
+		return wrapPlain(m.output, w)
+	}
+	v, err := decodeOrdered(m.output)
+	if err != nil {
+		return wrapPlain(m.output, w)
+	}
+	if m.jsonView {
+		if s, ok := indentJSON(m.output); ok {
+			return s
+		}
+		return wrapPlain(m.output, w)
+	}
+	if m.rows != nil {
+		if m.rowOpen {
+			return humanValue(m.rows[m.rowCursor], w, 0)
+		}
+		if t, ok := renderObjectTable(m.rows, w, m.rowCursor); ok {
+			return t
 		}
 	}
-	return wrapPlain(m.output, w)
+	return humanValue(v, w, 0)
 }
 
 // fitResult is the safety net that keeps a result from breaking the terminal: it
@@ -369,7 +487,16 @@ func (m model) viewResult() string {
 	if m.resultErr != nil {
 		status = red.Render("✗ ") + dim.Render(m.elapsed)
 	}
-	keys := "  ↑↓ scroll  ·  esc back  ·  r re-run"
+	listNav := m.rows != nil && !m.jsonView && !m.rowOpen
+	var keys string
+	switch {
+	case listNav:
+		keys = "  ↑↓ select  ·  enter expand  ·  esc back  ·  r re-run"
+	case m.rowOpen:
+		keys = "  ↑↓ scroll  ·  esc back to list  ·  r re-run"
+	default:
+		keys = "  ↑↓ scroll  ·  esc back  ·  r re-run"
+	}
 	if m.formTool != nil {
 		keys += "  ·  e edit"
 	}
@@ -386,11 +513,18 @@ func (m model) viewResult() string {
 		pct = dim.Render(fmt.Sprintf("%d%%  ", int(m.vp.ScrollPercent()*100)))
 	}
 	right := pct
+	if listNav {
+		right = dim.Render(fmt.Sprintf("%d/%d  ", m.rowCursor+1, len(m.rows))) + pct
+	}
 	if m.yankSeq != "" {
 		right = green.Render("copied  ") + pct
 	}
+	title := m.resultTitle + " → result"
+	if m.rowOpen {
+		title = m.resultTitle + fmt.Sprintf(" → row %d", m.rowCursor+1)
+	}
 	footer := m.rule() + "\n" + m.spread(dim.Render(keys), right)
-	return m.layout(m.header(m.resultTitle+" → result", status), m.vp.View(), footer)
+	return m.layout(m.header(title, status), m.vp.View(), footer)
 }
 
 func indent(s string) string {

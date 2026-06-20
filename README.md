@@ -68,7 +68,9 @@ schema-driven form and run it; read the result, then go again.
 Results are shown as an insight view that reads the data: field names become
 plain labels, values are formatted by what they are (dates, yes/no, status,
 links, grouped numbers), nested objects become sections, arrays of objects
-become tables, and short fields flow into columns to fill the screen. Press `t`
+become tables, and short fields flow into columns to fill the screen. When the
+result is a table, `↑`/`↓` select a row and `enter` expands it into a full,
+untruncated view of that record; `esc` collapses back to the list. Press `t`
 for the colored JSON, `y` to copy. `r` re-runs, `e` edits the arguments, `esc`
 (or `←`) goes back.
 

@@ -98,8 +98,11 @@ type model struct {
 	output      string
 	resultErr   error
 	elapsed     string
-	jsonView    bool   // result screen: show colored JSON instead of the insight view
-	yankSeq     string // OSC52 sequence to emit on the next render, cleared on the next key
+	jsonView    bool      // result screen: show colored JSON instead of the insight view
+	rows        []*object // result screen: the records when the payload is a table, enabling row navigation
+	rowCursor   int       // selected record in the table
+	rowOpen     bool      // a single record is expanded into its own detail view
+	yankSeq     string    // OSC52 sequence to emit on the next render, cleared on the next key
 	vp          viewport.Model
 	spin        spinner.Model
 }
@@ -134,6 +137,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.running = false
 		m.output, m.resultErr, m.elapsed = msg.output, msg.err, msg.elapsed
 		m.jsonView = false
+		m.rows, m.rowCursor, m.rowOpen = nil, 0, false
+		// A successful array-of-objects result becomes row-navigable.
+		if msg.err == nil && len(msg.output) <= maxPrettyBytes {
+			if v, e := decodeOrdered(msg.output); e == nil {
+				m.rows = asObjectRows(v)
+			}
+		}
 		m.screen = result
 		m.vp.SetContent(m.resultBody())
 		m.vp.GotoTop()
@@ -376,8 +386,8 @@ func (m model) helpView() string {
 		{"j / k   ↓ / ↑", "move up and down"},
 		{"g / G", "jump to top / bottom"},
 		{"ctrl+d / ctrl+u", "half page down / up"},
-		{"enter / l / →", "open the selected item"},
-		{"esc / h / ←", "go back"},
+		{"enter / l / →", "open item · expand a result row"},
+		{"esc / h / ←", "go back · collapse a row"},
 		{"tab / shift+tab", "next / previous section"},
 		{"/", "search the current list"},
 		{"r", "re-run a result"},
