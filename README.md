@@ -52,7 +52,8 @@ mctop upgrade                  update to the latest release
 ```
 
 A target is either a command to spawn (`"uvx mcp-server-time"`) or an
-`http(s)://` URL.
+`http(s)://` URL. A URL is dialed over streamable HTTP by default; add `--sse`
+for an older server that only speaks the legacy HTTP+SSE transport.
 
 ```
 mctop call "uvx mcp-server-time" get_current_time timezone=UTC
@@ -117,6 +118,7 @@ test` exits non-zero when the contract breaks, so it gates a build.
 ```yaml
 server:
   url: "https://api.example.com/mcp"
+  # sse: true                          # for a legacy HTTP+SSE server
   headers:
     Authorization: "Bearer ${TOKEN}"   # expanded from the environment
 expect:
