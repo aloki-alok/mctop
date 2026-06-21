@@ -84,6 +84,7 @@ type model struct {
 	query     string
 	searching bool
 	showHelp  bool
+	showTrace bool // the protocol trace overlay is open over whichever screen is active
 	vim       bool // when on, the hjkl-family motions are active alongside the arrows
 
 	width, height int
@@ -106,6 +107,7 @@ type model struct {
 	rowOpen     bool      // a single record is expanded into its own detail view
 	yankSeq     string    // OSC52 sequence to emit on the next render, cleared on the next key
 	vp          viewport.Model
+	traceVP     viewport.Model // scrolls the protocol trace overlay, kept apart from the result viewport
 	spin        spinner.Model
 }
 
@@ -123,7 +125,7 @@ func (m model) dispatch(title string, cmd tea.Cmd) (tea.Model, tea.Cmd) {
 
 // New builds the model from an already-connected client and its loaded surface.
 func New(ctx context.Context, server string, client *mcp.Client, tools []*sdk.Tool, resources []*sdk.Resource, prompts []*sdk.Prompt) tea.Model {
-	return model{ctx: ctx, server: server, client: client, tools: tools, resources: resources, prompts: prompts, vim: config.Load().Vim, vp: viewport.New(0, 0), spin: newSpinner()}
+	return model{ctx: ctx, server: server, client: client, tools: tools, resources: resources, prompts: prompts, vim: config.Load().Vim, vp: viewport.New(0, 0), traceVP: viewport.New(0, 0), spin: newSpinner()}
 }
 
 func (m model) Init() tea.Cmd { return nil }
@@ -134,6 +136,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		m.vp.Width = msg.Width
 		m.vp.Height = msg.Height - chromeHeight
+		m.traceVP.Width = msg.Width
+		m.traceVP.Height = msg.Height - chromeHeight
 		return m, nil
 	case callResultMsg:
 		m.running = false
@@ -173,6 +177,30 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		m.showHelp = false
+		return m, nil
+	}
+
+	// The trace overlay scrolls while open and closes on its own keys; any other
+	// key is fed to its viewport so the protocol log can be paged through.
+	if key, ok := msg.(tea.KeyMsg); ok && m.showTrace {
+		switch key.String() {
+		case "ctrl+c":
+			return m, tea.Quit
+		case "esc", "q", "T":
+			m.showTrace = false
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.traceVP, cmd = m.traceVP.Update(msg)
+		return m, cmd
+	}
+
+	// T opens the protocol trace over the browse or result screen. It is skipped
+	// while typing in the search box or a form so the key stays available there.
+	if key, ok := msg.(tea.KeyMsg); ok && key.String() == "T" && !m.searching && m.screen != form {
+		m.showTrace = true
+		m.traceVP.SetContent(m.traceBody())
+		m.traceVP.GotoBottom()
 		return m, nil
 	}
 
@@ -373,6 +401,9 @@ func (m model) screenView() string {
 	if m.showHelp {
 		return m.helpView()
 	}
+	if m.showTrace {
+		return m.viewTrace()
+	}
 	switch m.screen {
 	case form:
 		return m.viewForm()
@@ -398,6 +429,7 @@ func (m model) helpView() string {
 		{"y", "copy the result to the clipboard"},
 		{"e", "edit a call's arguments"},
 		{"V", "turn vim motions on or off"},
+		{"T", "show the protocol trace"},
 		{"?", "toggle this help"},
 		{"q", "quit"},
 	}
@@ -622,7 +654,7 @@ func (m model) toolDetail(t *sdk.Tool) string {
 }
 
 func (m model) footerView() string {
-	left := "  " + dim.Render("enter open  ·  / search  ·  tab section  ·  ? keys")
+	left := "  " + dim.Render("enter open  ·  / search  ·  tab section  ·  T trace  ·  ? keys")
 	if m.searching {
 		left = "  " + accent.Render("/"+m.query) + dim.Render("   enter open  ·  esc cancel")
 	}
