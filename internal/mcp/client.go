@@ -17,6 +17,7 @@ import (
 // Client is a connected, initialized MCP session.
 type Client struct {
 	sess *sdk.ClientSession
+	rec  *recorder
 }
 
 // Options tunes how Connect dials a target.
@@ -29,26 +30,41 @@ type Options struct {
 
 // Connect dials a target and returns an initialized client. A target is either
 // an http(s):// URL served over the streamable HTTP transport or a command to
-// spawn over stdio (for example "uvx mcp-server-time").
+// spawn over stdio (for example "uvx mcp-server-time"). Every JSON-RPC frame is
+// recorded so the trace view can show the protocol after the fact.
 func Connect(ctx context.Context, target string, opts Options) (*Client, error) {
-	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
-		return connectHTTP(ctx, target, opts.Headers)
+	transport, err := transportFor(target, opts.Headers)
+	if err != nil {
+		return nil, err
 	}
-	return connectStdio(ctx, target)
+	rec := &recorder{}
+	client := sdk.NewClient(&sdk.Implementation{Name: "mctop", Version: "dev"}, nil)
+	sess, err := client.Connect(ctx, &sdk.LoggingTransport{Transport: transport, Writer: rec}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("connect to %q: %w", target, err)
+	}
+	return &Client{sess: sess, rec: rec}, nil
 }
 
-func connectHTTP(ctx context.Context, endpoint string, headers map[string]string) (*Client, error) {
-	client := sdk.NewClient(&sdk.Implementation{Name: "mctop", Version: "dev"}, nil)
-	transport := &sdk.StreamableClientTransport{Endpoint: endpoint}
-	if len(headers) > 0 {
-		transport.HTTPClient = &http.Client{Transport: headerRoundTripper{headers: headers}}
+// transportFor picks the transport for a target: streamable HTTP for an
+// http(s):// URL (with any fixed headers), stdio otherwise.
+func transportFor(target string, headers map[string]string) (sdk.Transport, error) {
+	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
+		t := &sdk.StreamableClientTransport{Endpoint: target}
+		if len(headers) > 0 {
+			t.HTTPClient = &http.Client{Transport: headerRoundTripper{headers: headers}}
+		}
+		return t, nil
 	}
-	sess, err := client.Connect(ctx, transport, nil)
-	if err != nil {
-		return nil, fmt.Errorf("connect to %q: %w", endpoint, err)
+	argv := strings.Fields(target)
+	if len(argv) == 0 {
+		return nil, fmt.Errorf("empty command")
 	}
-	return &Client{sess: sess}, nil
+	return &sdk.CommandTransport{Command: exec.Command(argv[0], argv[1:]...)}, nil
 }
+
+// Trace returns the JSON-RPC frames recorded so far, oldest first.
+func (c *Client) Trace() []Frame { return c.rec.snapshot() }
 
 // headerRoundTripper adds fixed headers to every request before delegating to
 // the default transport.
@@ -61,20 +77,6 @@ func (h headerRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 		req.Header.Set(k, v)
 	}
 	return http.DefaultTransport.RoundTrip(req)
-}
-
-func connectStdio(ctx context.Context, command string) (*Client, error) {
-	argv := strings.Fields(command)
-	if len(argv) == 0 {
-		return nil, fmt.Errorf("empty command")
-	}
-	cmd := exec.Command(argv[0], argv[1:]...)
-	client := sdk.NewClient(&sdk.Implementation{Name: "mctop", Version: "dev"}, nil)
-	sess, err := client.Connect(ctx, &sdk.CommandTransport{Command: cmd}, nil)
-	if err != nil {
-		return nil, fmt.Errorf("connect to %q: %w", command, err)
-	}
-	return &Client{sess: sess}, nil
 }
 
 // Close ends the session and stops the spawned server.
