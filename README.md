@@ -68,7 +68,7 @@ tools, resources, and prompts; press enter on a tool to fill its arguments in a
 schema-driven form and run it; read the result, then go again.
 
 ```
-↑↓ move    enter open    / search    tab switch section    ? keys    q quit
+↑↓ move    enter open    / search    tab switch section    T trace    ? keys    q quit
 ```
 
 Results are shown as an insight view that reads the data: field names become
@@ -81,6 +81,11 @@ untruncated view of that record; `esc` collapses back to the list. A wide record
 shows a scannable few columns in the table and the rest on expand. Press `t` for
 the colored JSON, `y` to copy. `r` re-runs, `e` edits the arguments, `esc` (or
 `←`) goes back.
+
+Press `T` to see the raw protocol: every JSON-RPC frame that crossed the wire,
+each tagged with its direction, method, and time, above its JSON. It reads like
+the web Inspector's network pane, without leaving the terminal, so you can see
+exactly what a server sent back when a call surprises you.
 
 Vim motions (`h`/`j`/`k`/`l`, `g`/`G`) are on by default; `V` toggles them and the
 choice is remembered. The arrow keys always work either way. Press `?` for the
