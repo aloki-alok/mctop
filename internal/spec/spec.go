@@ -26,6 +26,7 @@ type Server struct {
 	Command string            `yaml:"command"`
 	URL     string            `yaml:"url"`
 	Headers map[string]string `yaml:"headers"`
+	SSE     bool              `yaml:"sse"` // dial a URL over legacy HTTP+SSE instead of streamable HTTP
 }
 
 // Expect lists invariants about the server's surface.

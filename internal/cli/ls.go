@@ -12,13 +12,13 @@ import (
 
 // LS connects to the target and prints its tools, resources, and prompts.
 func LS(args []string) int {
-	headers, rest, err := extractHeaders(args)
+	opts, rest, err := extractConn(args)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mctop:", err)
 		return 2
 	}
 	if len(rest) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: mctop ls <target> [-H \"Name: value\"]")
+		fmt.Fprintln(os.Stderr, "usage: mctop ls <target> [--sse] [-H \"Name: value\"]")
 		return 2
 	}
 	target := strings.Join(rest, " ")
@@ -26,7 +26,8 @@ func LS(args []string) int {
 	ctx, cancel := context.WithTimeout(context.Background(), dialTimeout)
 	defer cancel()
 
-	client, err := mcp.Connect(ctx, target, mcp.Options{Headers: withAuth(ctx, target, headers)})
+	opts.Headers = withAuth(ctx, target, opts.Headers)
+	client, err := mcp.Connect(ctx, target, opts)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mctop:", err)
 		hintLogin(target, err)

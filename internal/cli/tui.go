@@ -16,7 +16,7 @@ import (
 // TUI connects to a target and opens the interactive browser. It is what a bare
 // "mctop <target>" runs.
 func TUI(args []string) int {
-	headers, rest, err := extractHeaders(args)
+	opts, rest, err := extractConn(args)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mctop:", err)
 		return 2
@@ -32,7 +32,8 @@ func TUI(args []string) int {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	client, err := mcp.Connect(ctx, target, mcp.Options{Headers: withAuth(ctx, target, headers)})
+	opts.Headers = withAuth(ctx, target, opts.Headers)
+	client, err := mcp.Connect(ctx, target, opts)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mctop:", err)
 		hintLogin(target, err)
