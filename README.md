@@ -11,6 +11,8 @@ schema fails the build instead of breaking an agent in production.
 
 Think `curl` and `k9s`, but for the Model Context Protocol.
 
+![mctop browsing a server, calling a tool, and showing the protocol trace](./docs/demo.gif)
+
 It works over stdio (it spawns the server) and Streamable HTTP (it connects to a
 URL), with OAuth login for protected servers. Building in the open; see
 [DESIGN.md](./DESIGN.md).
