@@ -49,6 +49,7 @@ func (m model) openForm(tool *sdk.Tool) model {
 	m.formTool = tool
 	m.inputs = inputs
 	m.focus = 0
+	m.formMsg = ""
 	m.screen = form
 	m.output, m.resultErr, m.elapsed = "", nil, ""
 	return m
@@ -63,14 +64,24 @@ func (m model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.screen = browse
 			return m, nil
 		case "enter":
+			if i, missing := m.firstMissingRequired(); missing {
+				m.formMsg = m.inputs[i].arg.Name + " is required"
+				m.refocus(i)
+				return m, nil
+			}
+			m.formMsg = ""
 			return m.dispatch(m.formTool.Name, m.runCall())
 		case "tab", "down":
+			m.formMsg = ""
 			m.refocus(m.focus + 1)
 			return m, nil
 		case "shift+tab", "up":
+			m.formMsg = ""
 			m.refocus(m.focus - 1)
 			return m, nil
 		}
+		// A keystroke that edits the focused field clears a stale message.
+		m.formMsg = ""
 	}
 	if len(m.inputs) > 0 {
 		var cmd tea.Cmd
@@ -78,6 +89,18 @@ func (m model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	return m, nil
+}
+
+// firstMissingRequired finds the first required field left blank, so the form
+// can point at it instead of dispatching a call the server will only reject. A
+// whitespace-only value counts as blank, matching collectArgs.
+func (m model) firstMissingRequired() (int, bool) {
+	for i, fi := range m.inputs {
+		if fi.arg.Required && strings.TrimSpace(fi.input.Value()) == "" {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 // refocus moves the focused field, wrapping around the list.
@@ -375,6 +398,9 @@ func (m model) formBody() string {
 			b.WriteString("  " + dim.Render(fi.arg.Type))
 		}
 		b.WriteString("\n\n")
+	}
+	if m.formMsg != "" {
+		b.WriteString(red.Render(m.formMsg) + "\n\n")
 	}
 	b.WriteString(accent.Render("enter") + dim.Render(" to run"))
 	return b.String()

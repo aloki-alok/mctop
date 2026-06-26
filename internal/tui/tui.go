@@ -93,6 +93,7 @@ type model struct {
 	formTool    *sdk.Tool
 	inputs      []formInput
 	focus       int
+	formMsg     string // a validation message shown under the form, e.g. a missing required field
 	running     bool
 	resultTitle string
 	lastCmd     tea.Cmd

@@ -3,8 +3,27 @@ package tui
 import (
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+func TestEnterWithEmptyRequiredFieldBlocksSubmit(t *testing.T) {
+	m := model{tools: []*sdk.Tool{toolWithArgs()}, width: 80}
+	opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = opened.(model) // form is open, timezone (required) is empty
+
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := next.(model)
+	if got.screen != form {
+		t.Fatalf("submit with empty required field should stay on the form, screen=%v", got.screen)
+	}
+	if got.formMsg == "" {
+		t.Error("a missing required field should set a validation message")
+	}
+	if cmd != nil {
+		t.Error("no call should be dispatched while a required field is empty")
+	}
+}
 
 func TestToolArgsReadsEnumDefaultFormat(t *testing.T) {
 	tool := &sdk.Tool{
