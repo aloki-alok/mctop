@@ -55,8 +55,9 @@ A target is either a command to spawn (`"uvx mcp-server-time"`) or an
 mctop call "uvx mcp-server-time" get_current_time timezone=UTC
 ```
 
-Arguments are `key=value` pairs (each parsed as JSON, falling back to a string),
-or a single `--json '{...}'` object.
+Arguments are `key=value` pairs (values that look like JSON, such as numbers,
+booleans, arrays, and objects, are typed; anything else is a string), or a
+single `--json '{...}'` object.
 
 ## Interactive mode
 
