@@ -13,10 +13,6 @@ Think `curl` and `k9s`, but for the Model Context Protocol.
 
 ![mctop browsing a server, calling a tool, and showing the protocol trace](./docs/demo.gif)
 
-It works over stdio (it spawns the server) and Streamable HTTP (it connects to a
-URL), with OAuth login for protected servers. Building in the open; see
-[DESIGN.md](./DESIGN.md).
-
 ## What it does
 
 - **Explore** a server interactively: browse tools, resources, and prompts, fill
@@ -52,8 +48,8 @@ mctop upgrade                  update to the latest release
 ```
 
 A target is either a command to spawn (`"uvx mcp-server-time"`) or an
-`http(s)://` URL. A URL is dialed over streamable HTTP by default; add `--sse`
-for an older server that only speaks the legacy HTTP+SSE transport.
+`http(s)://` URL. For an older server that needs the legacy SSE transport, add
+`--sse`.
 
 ```
 mctop call "uvx mcp-server-time" get_current_time timezone=UTC
@@ -72,16 +68,11 @@ schema-driven form and run it; read the result, then go again.
 ↑↓ move    enter open    / search    tab switch section    T trace    ? keys    q quit
 ```
 
-Results are shown as an insight view that reads the data: field names become
-plain labels, values are formatted by what they are (dates, yes/no, status,
-links, grouped numbers), nested objects become sections, arrays of objects
-become tables, and short fields flow into columns to fill the screen. When the
-result is a list of records (a bare array, or one wrapped in a `{status, total,
-data: [...]}` envelope), `↑`/`↓` select a row and `enter` expands it into a full,
-untruncated view of that record; `esc` collapses back to the list. A wide record
-shows a scannable few columns in the table and the rest on expand. Press `t` for
-the colored JSON, `y` to copy. `r` re-runs, `e` edits the arguments, `esc` (or
-`←`) goes back.
+Results render as readable fields and tables instead of raw JSON. When the
+result is a list of records, `↑`/`↓` select a row and `enter` expands it into a
+full, untruncated view; `esc` collapses back to the list. Press `t` for the raw
+JSON, `y` to copy, `r` to re-run, `e` to edit the arguments, and `esc` (or `←`)
+to go back.
 
 Press `T` to see the raw protocol: every JSON-RPC frame that crossed the wire,
 each tagged with its direction, method, and time, above its JSON. It reads like

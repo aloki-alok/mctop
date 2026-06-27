@@ -6,3 +6,6 @@
 
 # editor / OS
 .DS_Store
+
+# local-only notes (internal "how", not shipped)
+CLAUDE.local.md
